@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Milestone Configuration</title>
+    <!-- Include SortableJS for drag and drop functionality -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f4f4f4;
+        }
+        tbody tr {
+            cursor: move;
+        }
+        tbody tr:hover {
+            background-color: #f8f8f8;
+        }
+        .controls {
+            margin-bottom: 20px;
+        }
+        select, input {
+            width: 90%;
+            padding: 4px;
+        }
+        .actions {
+            white-space: nowrap;
+        }
+        button {
+            margin: 2px;
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.4);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 50%;
+            text-align: center;
+        }
+        .toast {
+            visibility: hidden;
+            min-width: 250px;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 2px;
+            padding: 16px;
+            position: fixed;
+            z-index: 1;
+            right: 30px;
+            top: 30px;
+        }
+        .toast.show {
+            visibility: visible;
+            -webkit-animation: fadein 0.5s;
+            animation: fadein 0.5s;
+        }
+        .drag-handle {
+            cursor: move;
+            color: #999;
+            user-select: none;
+        }
+        @-webkit-keyframes fadein {
+            from {top: 0; opacity: 0;} 
+            to {top: 30px; opacity: 1;}
+        }
+        @keyframes fadein {
+            from {top: 0; opacity: 0;}
+            to {top: 30px; opacity: 1;}
+        }
+    </style>
+</head>
+<body>
+    <h1>Milestone Configuration</h1>
+    
+    <div class="controls">
+        <button onclick="showOptOutModal()" class="opt-out-btn">OPT OUT OF NICHE YIELD</button>
+    </div>
+
+    <div id="optOutModal" class="modal">
+        <div class="modal-content">
+            <h2>Do you want to opt out of the Niche Yield Product and inactivate the Product?</h2>
+            <button onclick="confirmOptOut()">Yes</button>
+            <button onclick="closeModal()">No</button>
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <table id="milestonesTable">
+        <thead>
+            <tr>
+                <th>Order</th>
+                <th>Milestone Name</th>
+                <th>Display Name</th>
+                <th>Status</th>
+                <th>Required/Optional</th>
+                <th>Launch Method</th>
+                <th>URL</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="milestonesBody">
+        </tbody>
+    </table>
+
+    <script>
+        let milestones = [
+            { order: 1, milestoneName: "Schedule a Visit", displayName: "Schedule Campus Visit", status: "Active", required: "Required", launchMethod: "Embed", url: "https://visit.example.com" },
+            { order: 2, milestoneName: "Start/Finish Application", displayName: "Complete Application", status: "Active", required: "Required", launchMethod: "External URL", url: "https://apply.example.com" },
+            { order: 3, milestoneName: "Submit Transcripts", displayName: "Upload Transcripts", status: "Active", required: "Required", launchMethod: "Embed", url: "https://transcripts.example.com" },
+            { order: 4, milestoneName: "Talk to Counselor", displayName: "Counselor Meeting", status: "Active", required: "Optional", launchMethod: "External URL", url: "https://counselor.example.com" },
+            { order: 5, milestoneName: "Understand Costs", displayName: "Cost Calculator", status: "Active", required: "Required", launchMethod: "Embed", url: "https://costs.example.com" },
+            { order: 6, milestoneName: "Complete FAFSA", displayName: "FAFSA Application", status: "Active", required: "Required", launchMethod: "External URL", url: "https://fafsa.gov" },
+            { order: 7, milestoneName: "Complete Onboarding Forms", displayName: "Onboarding", status: "Active", required: "Required", launchMethod: "Embed", url: "https://onboarding.example.com" },
+            { order: 8, milestoneName: "Deposit", displayName: "Pay Deposit", status: "Active", required: "Required", launchMethod: "External URL", url: "https://payment.example.com" }
+        ];
+
+        function renderTable() {
+            const tbody = document.getElementById('milestonesBody');
+            tbody.innerHTML = '';
+            
+            milestones.forEach((milestone, index) => {
+                const row = document.createElement('tr');
+                row.setAttribute('data-id', index);
+                row.innerHTML = `
+                    <td class="drag-handle">↕ ${milestone.order}</td>
+                    <td>${milestone.milestoneName}</td>
+                    <td>${milestone.displayName}</td>
+                    <td>
+                        <select onchange="updateStatus(${index}, this.value)">
+                            <option value="Active" ${milestone.status === 'Active' ? 'selected' : ''}>Active</option>
+                            <option value="Inactive" ${milestone.status === 'Inactive' ? 'selected' : ''}>Inactive</option>
+                        </select>
+                    </td>
+                    <td>
+                        <select onchange="updateRequired(${index}, this.value)">
+                            <option value="Required" ${milestone.required === 'Required' ? 'selected' : ''}>Required</option>
+                            <option value="Optional" ${milestone.required === 'Optional' ? 'selected' : ''}>Optional</option>
+                        </select>
+                    </td>
+                    <td>${milestone.launchMethod}</td>
+                    <td><input type="text" value="${milestone.url}" onchange="updateURL(${index}, this.value)"></td>
+                    <td class="actions">
+                        <button onclick="editRow(${index})">Edit</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            // Initialize drag and drop
+            initializeDragAndDrop();
+        }
+
+        function initializeDragAndDrop() {
+            const tbody = document.getElementById('milestonesBody');
+            new Sortable(tbody, {
+                animation: 150,
+                handle: '.drag-handle',
+                onEnd: function(evt) {
+                    const itemEl = evt.item;
+                    const oldIndex = evt.oldIndex;
+                    const newIndex = evt.newIndex;
+
+                    // Reorder the milestones array
+                    const item = milestones.splice(oldIndex, 1)[0];
+                    milestones.splice(newIndex, 0, item);
+
+                    // Update order numbers
+                    milestones.forEach((milestone, index) => {
+                        milestone.order = index + 1;
+                    });
+
+                    // Re-render the table
+                    renderTable();
+                }
+            });
+        }
+
+        function editRow(index) {
+            const milestone = milestones[index];
+            const row = document.getElementById('milestonesBody').children[index];
+            
+            row.innerHTML = `
+                <td>${milestone.order}</td>
+                <td><input type="text" value="${milestone.milestoneName}"></td>
+                <td><input type="text" value="${milestone.displayName}"></td>
+                <td>
+                    <select>
+                        <option value="Active" ${milestone.status === 'Active' ? 'selected' : ''}>Active</option>
+                        <option value="Inactive" ${milestone.status === 'Inactive' ? 'selected' : ''}>Inactive</option>
+                    </select>
+                </td>
+                <td>
+                    <select>
+                        <option value="Required" ${milestone.required === 'Required' ? 'selected' : ''}>Required</option>
+                        <option value="Optional" ${milestone.required === 'Optional' ? 'selected' : ''}>Optional</option>
+                    </select>
+                </td>
+                <td>${milestone.launchMethod}</td>
+                <td><input type="text" value="${milestone.url}"></td>
+                <td class="actions">
+                    <button onclick="saveRow(${index})">Save</button>
+                    <button onclick="renderTable()">Cancel</button>
+                </td>
+            `;
+        }
+
+        function saveRow(index) {
+            const row = document.getElementById('milestonesBody').children[index];
+            const inputs = row.getElementsByTagName('input');
+            const selects = row.getElementsByTagName('select');
+            
+            milestones[index] = {
+                order: milestones[index].order,
+                milestoneName: inputs[0].value,
+                displayName: inputs[1].value,
+                status: selects[0].value,
+                required: selects[1].value,
+                launchMethod: milestones[index].launchMethod,
+                url: inputs[2].value
+            };
+            
+            renderTable();
+        }
+
+        function updateStatus(index, value) {
+            milestones[index].status = value;
+        }
+
+        function updateRequired(index, value) {
+            milestones[index].required = value;
+        }
+
+        function updateURL(index, value) {
+            milestones[index].url = value;
+        }
+
+        function showOptOutModal() {
+            document.getElementById('optOutModal').style.display = "block";
+        }
+
+        function closeModal() {
+            document.getElementById('optOutModal').style.display = "none";
+        }
+
+        function confirmOptOut() {
+            milestones.forEach(milestone => {
+                milestone.status = "Inactive";
+            });
+            renderTable();
+            closeModal();
+            showToast("You have successfully opted out of Niche Yield.");
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById("toast");
+            toast.textContent = message;
+            toast.className = "toast show";
+            setTimeout(() => {
+                toast.className = toast.className.replace("show", "");
+            }, 3000);
+        }
+
+        // Close modal if clicking outside of it
+        window.onclick = function(event) {
+            const modal = document.getElementById('optOutModal');
+            if (event.target == modal) {
+                closeModal();
+            }
+        }
+
+        // Initial render
+        renderTable();
+    </script>
+</body>
+</html>
