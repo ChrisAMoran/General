@@ -4,13 +4,29 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Milestone Configuration</title>
-    <!-- Include SortableJS for drag and drop functionality -->
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
             margin: 20px;
             padding: 20px;
+        }
+        .header-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .save-button {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .save-button:hover {
+            background-color: #218838;
         }
         table {
             width: 100%;
@@ -25,21 +41,26 @@
         th {
             background-color: #f4f4f4;
         }
-        tbody tr {
+        tr.draggable {
             cursor: move;
         }
-        tbody tr:hover {
-            background-color: #f8f8f8;
+        tr.dragging {
+            opacity: 0.5;
+            background-color: #f8f9fa;
         }
         .controls {
             margin-bottom: 20px;
         }
-        select, input {
+        select, input[type="text"], input[type="date"] {
             width: 90%;
             padding: 4px;
         }
-        .actions {
-            white-space: nowrap;
+        .url-updated {
+            background-color: yellow !important;
+            transition: background-color 0.7s;
+        }
+        .row-error {
+            background-color: #ffd6d6 !important;
         }
         button {
             margin: 2px;
@@ -67,25 +88,29 @@
         .toast {
             visibility: hidden;
             min-width: 250px;
-            background-color: #333;
-            color: #fff;
             text-align: center;
-            border-radius: 2px;
+            border-radius: 4px;
             padding: 16px;
             position: fixed;
             z-index: 1;
             right: 30px;
             top: 30px;
+            background-color: #333;
+        }
+        .toast.success {
+            color: #28a745;
+            background-color: white;
+            border: 1px solid #28a745;
         }
         .toast.show {
             visibility: visible;
             -webkit-animation: fadein 0.5s;
             animation: fadein 0.5s;
         }
-        .drag-handle {
-            cursor: move;
-            color: #999;
-            user-select: none;
+        .toast.error {
+            color: #b20000;
+            background-color: #fff4f4;
+            border: 1px solid #b20000;
         }
         @-webkit-keyframes fadein {
             from {top: 0; opacity: 0;} 
@@ -98,15 +123,18 @@
     </style>
 </head>
 <body>
-    <h1>Milestone Configuration</h1>
+    <div class="header-container">
+        <h1>Milestone Configuration</h1>
+        <button class="save-button" onclick="saveChanges()">Approve</button>
+    </div>
     
     <div class="controls">
-        <button onclick="showOptOutModal()" class="opt-out-btn">OPT OUT OF NICHE YIELD</button>
+        <button onclick="showOptOutModal()" class="opt-out-btn">Opt out of Niche Yield Campaign Messaging</button>
     </div>
 
     <div id="optOutModal" class="modal">
         <div class="modal-content">
-            <h2>Do you want to opt out of the Niche Yield Product and inactivate the Product?</h2>
+            <h2>Do you want to opt out of Niche Yield Campaign Messages?</h2>
             <button onclick="confirmOptOut()">Yes</button>
             <button onclick="closeModal()">No</button>
         </div>
@@ -120,11 +148,10 @@
                 <th>Order</th>
                 <th>Milestone Name</th>
                 <th>Display Name</th>
+                <th>Due Date</th>
                 <th>Status</th>
                 <th>Required/Optional</th>
-                <th>Launch Method</th>
                 <th>URL</th>
-                <th>Actions</th>
             </tr>
         </thead>
         <tbody id="milestonesBody">
@@ -132,28 +159,80 @@
     </table>
 
     <script>
+        // Helper for formatting date to yyyy-mm-dd for <input type="date">
+        function formatDateForInput(val) {
+            if (!val) return "";
+            // Accept mm/dd/yyyy or yyyy-mm-dd
+            if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
+            const match = val.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+            if (match) {
+                let [_, mm, dd, yyyy] = match;
+                if (mm.length === 1) mm = "0" + mm;
+                if (dd.length === 1) dd = "0" + dd;
+                return `${yyyy}-${mm}-${dd}`;
+            }
+            return "";
+        }
+
+        // Helper for displaying date as mm/dd/yyyy
+        function formatDateForDisplay(val) {
+            if (!val) return "";
+            const d = new Date(val);
+            if (!(d instanceof Date) || isNaN(d)) return val;
+            let mm = d.getMonth() + 1, dd = d.getDate(), yyyy = d.getFullYear();
+            if (mm < 10) mm = "0" + mm;
+            if (dd < 10) dd = "0" + dd;
+            return `${mm}/${dd}/${yyyy}`;
+        }
+
         let milestones = [
-            { order: 1, milestoneName: "Schedule a Visit", displayName: "Schedule Campus Visit", status: "Active", required: "Required", launchMethod: "Embed", url: "https://visit.example.com" },
-            { order: 2, milestoneName: "Start/Finish Application", displayName: "Complete Application", status: "Active", required: "Required", launchMethod: "External URL", url: "https://apply.example.com" },
-            { order: 3, milestoneName: "Submit Transcripts", displayName: "Upload Transcripts", status: "Active", required: "Required", launchMethod: "Embed", url: "https://transcripts.example.com" },
-            { order: 4, milestoneName: "Talk to Counselor", displayName: "Counselor Meeting", status: "Active", required: "Optional", launchMethod: "External URL", url: "https://counselor.example.com" },
-            { order: 5, milestoneName: "Understand Costs", displayName: "Cost Calculator", status: "Active", required: "Required", launchMethod: "Embed", url: "https://costs.example.com" },
-            { order: 6, milestoneName: "Complete FAFSA", displayName: "FAFSA Application", status: "Active", required: "Required", launchMethod: "External URL", url: "https://fafsa.gov" },
-            { order: 7, milestoneName: "Complete Onboarding Forms", displayName: "Onboarding", status: "Active", required: "Required", launchMethod: "Embed", url: "https://onboarding.example.com" },
-            { order: 8, milestoneName: "Deposit", displayName: "Pay Deposit", status: "Active", required: "Required", launchMethod: "External URL", url: "https://payment.example.com" }
+            { order: 1, milestoneName: "Schedule a Visit", displayName: "Schedule Campus Visit", dueDate: "", status: "Active", required: "Optional", url: "https://visit.example.com" },
+            { order: 2, milestoneName: "Start/Finish Application", displayName: "Complete Application", dueDate: "", status: "Active", required: "Required", url: "https://apply.example.com" },
+            { order: 3, milestoneName: "Submit Transcripts", displayName: "Upload Transcripts", dueDate: "", status: "Active", required: "Optional", url: "https://transcripts.example.com" },
+            { order: 4, milestoneName: "Talk to Counselor", displayName: "Counselor Meeting", dueDate: "", status: "Active", required: "Optional", url: "https://counselor.example.com" },
+            { order: 5, milestoneName: "Understand Costs", displayName: "Cost Calculator", dueDate: "", status: "Active", required: "Optional", url: "https://costs.example.com" },
+            { order: 6, milestoneName: "Complete FAFSA", displayName: "FAFSA Application", dueDate: "", status: "Active", required: "Optional", url: "https://fafsa.gov" },
+            { order: 7, milestoneName: "Complete Onboarding Forms", displayName: "Onboarding", dueDate: "", status: "Active", required: "Optional", url: "https://onboarding.example.com" },
+            { order: 8, milestoneName: "Deposit", displayName: "Pay Deposit", dueDate: "", status: "Active", required: "Required", url: "https://payment.example.com" }
         ];
+
+        // Store the original URL values to check for changes
+        let originalUrls = milestones.map(m => m.url);
+        // Track which URLs have been changed for yellow highlight
+        let urlUpdatedFlags = milestones.map(_ => false);
+
+        // Track which row has due date error
+        let dueDateErrorFlags = milestones.map(_ => false);
 
         function renderTable() {
             const tbody = document.getElementById('milestonesBody');
             tbody.innerHTML = '';
-            
             milestones.forEach((milestone, index) => {
-                const row = document.createElement('tr');
-                row.setAttribute('data-id', index);
+                const urlCellClass = urlUpdatedFlags[index] ? "url-updated" : "";
+                const rowClass = dueDateErrorFlags[index] ? "row-error" : "";
+                const dateVal = milestone.dueDate ? milestone.dueDate : "";
+                row = document.createElement('tr');
+                row.className = `draggable ${rowClass}`;
+                row.draggable = true;
+                row.setAttribute('data-index', index);
+
+                // For browsers, input[type=date] will show the native picker, but user can still type mm/dd/yyyy.
                 row.innerHTML = `
-                    <td class="drag-handle">↕ ${milestone.order}</td>
+                    <td>${milestone.order}</td>
                     <td>${milestone.milestoneName}</td>
-                    <td>${milestone.displayName}</td>
+                    <td>
+                        <input type="text" value="${milestone.displayName.replace(/"/g, '&quot;')}" 
+                            onchange="updateDisplayName(${index}, this.value)">
+                    </td>
+                    <td>
+                        <input 
+                            type="text"
+                            placeholder="mm/dd/yyyy"
+                            value="${milestone.dueDate ? formatDateForDisplay(milestone.dueDate) : ''}"
+                            onfocus="this.type='date'; this.value='${formatDateForInput(milestone.dueDate)}';"
+                            onblur="this.type='text'; if(this.value) this.value=formatDateForDisplay(this.value);"
+                            onchange="updateDueDate(${index}, this.value, this)">
+                    </td>
                     <td>
                         <select onchange="updateStatus(${index}, this.value)">
                             <option value="Active" ${milestone.status === 'Active' ? 'selected' : ''}>Active</option>
@@ -166,89 +245,116 @@
                             <option value="Optional" ${milestone.required === 'Optional' ? 'selected' : ''}>Optional</option>
                         </select>
                     </td>
-                    <td>${milestone.launchMethod}</td>
-                    <td><input type="text" value="${milestone.url}" onchange="updateURL(${index}, this.value)"></td>
-                    <td class="actions">
-                        <button onclick="editRow(${index})">Edit</button>
+                    <td class="${urlCellClass}">
+                        <input type="text" value="${milestone.url}" 
+                            onchange="updateURL(${index}, this.value, this)">
                     </td>
                 `;
                 tbody.appendChild(row);
             });
 
-            // Initialize drag and drop
-            initializeDragAndDrop();
+            setupDragAndDrop();
         }
 
-        function initializeDragAndDrop() {
+        function updateDisplayName(index, value) {
+            milestones[index].displayName = value;
+        }
+
+        function updateDueDate(index, value, input) {
+            // Accept both yyyy-mm-dd and mm/dd/yyyy
+            let dateStr = value;
+            // If user typed mm/dd/yyyy, convert to yyyy-mm-dd for storage
+            if (/^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
+                const [mm, dd, yyyy] = value.split('/');
+                dateStr = `${yyyy}-${mm}-${dd}`;
+            }
+            // If user typed single digit month/day
+            else if (/^\d{1}\/\d{2}\/\d{4}$/.test(value)) {
+                let [mm, dd, yyyy] = value.split('/');
+                if (mm.length === 1) mm = "0" + mm;
+                dateStr = `${yyyy}-${mm}-${dd}`;
+            }
+            else if (/^\d{2}\/\d{1}\/\d{4}$/.test(value)) {
+                let [mm, dd, yyyy] = value.split('/');
+                if (dd.length === 1) dd = "0" + dd;
+                dateStr = `${yyyy}-${mm}-${dd}`;
+            }
+            // Native date input (yyyy-mm-dd)
+            else if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+                dateStr = value;
+            }
+            // else just store as is (will be invalid)
+            milestones[index].dueDate = dateStr;
+        }
+
+        function setupDragAndDrop() {
             const tbody = document.getElementById('milestonesBody');
-            new Sortable(tbody, {
-                animation: 150,
-                handle: '.drag-handle',
-                onEnd: function(evt) {
-                    const itemEl = evt.item;
-                    const oldIndex = evt.oldIndex;
-                    const newIndex = evt.newIndex;
+            const rows = tbody.getElementsByClassName('draggable');
 
-                    // Reorder the milestones array
-                    const item = milestones.splice(oldIndex, 1)[0];
-                    milestones.splice(newIndex, 0, item);
-
-                    // Update order numbers
-                    milestones.forEach((milestone, index) => {
-                        milestone.order = index + 1;
-                    });
-
-                    // Re-render the table
-                    renderTable();
-                }
+            Array.from(rows).forEach(row => {
+                row.addEventListener('dragstart', handleDragStart);
+                row.addEventListener('dragenter', handleDragEnter);
+                row.addEventListener('dragover', handleDragOver);
+                row.addEventListener('dragleave', handleDragLeave);
+                row.addEventListener('drop', handleDrop);
+                row.addEventListener('dragend', handleDragEnd);
             });
         }
 
-        function editRow(index) {
-            const milestone = milestones[index];
-            const row = document.getElementById('milestonesBody').children[index];
-            
-            row.innerHTML = `
-                <td>${milestone.order}</td>
-                <td><input type="text" value="${milestone.milestoneName}"></td>
-                <td><input type="text" value="${milestone.displayName}"></td>
-                <td>
-                    <select>
-                        <option value="Active" ${milestone.status === 'Active' ? 'selected' : ''}>Active</option>
-                        <option value="Inactive" ${milestone.status === 'Inactive' ? 'selected' : ''}>Inactive</option>
-                    </select>
-                </td>
-                <td>
-                    <select>
-                        <option value="Required" ${milestone.required === 'Required' ? 'selected' : ''}>Required</option>
-                        <option value="Optional" ${milestone.required === 'Optional' ? 'selected' : ''}>Optional</option>
-                    </select>
-                </td>
-                <td>${milestone.launchMethod}</td>
-                <td><input type="text" value="${milestone.url}"></td>
-                <td class="actions">
-                    <button onclick="saveRow(${index})">Save</button>
-                    <button onclick="renderTable()">Cancel</button>
-                </td>
-            `;
+        let draggedRow = null;
+
+        function handleDragStart(e) {
+            draggedRow = this;
+            this.classList.add('dragging');
         }
 
-        function saveRow(index) {
-            const row = document.getElementById('milestonesBody').children[index];
-            const inputs = row.getElementsByTagName('input');
-            const selects = row.getElementsByTagName('select');
+        function handleDragOver(e) {
+            e.preventDefault();
+        }
+
+        function handleDragEnter(e) {
+            e.preventDefault();
+            this.classList.add('dragover');
+        }
+
+        function handleDragLeave(e) {
+            this.classList.remove('dragover');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            this.classList.remove('dragover');
             
-            milestones[index] = {
-                order: milestones[index].order,
-                milestoneName: inputs[0].value,
-                displayName: inputs[1].value,
-                status: selects[0].value,
-                required: selects[1].value,
-                launchMethod: milestones[index].launchMethod,
-                url: inputs[2].value
-            };
-            
-            renderTable();
+            if (draggedRow !== this) {
+                const allRows = [...document.getElementsByClassName('draggable')];
+                const draggedIndex = parseInt(draggedRow.getAttribute('data-index'));
+                const droppedIndex = parseInt(this.getAttribute('data-index'));
+                
+                // Update the milestones array
+                const [movedMilestone] = milestones.splice(draggedIndex, 1);
+                milestones.splice(droppedIndex, 0, movedMilestone);
+
+                // Update originalUrls and urlUpdatedFlags accordingly
+                const [movedUrl] = originalUrls.splice(draggedIndex, 1);
+                originalUrls.splice(droppedIndex, 0, movedUrl);
+                const [movedFlag] = urlUpdatedFlags.splice(draggedIndex, 1);
+                urlUpdatedFlags.splice(droppedIndex, 0, movedFlag);
+
+                const [movedErrorFlag] = dueDateErrorFlags.splice(draggedIndex, 1);
+                dueDateErrorFlags.splice(droppedIndex, 0, movedErrorFlag);
+
+                // Update order numbers
+                milestones.forEach((milestone, idx) => {
+                    milestone.order = idx + 1;
+                });
+                
+                renderTable();
+            }
+        }
+
+        function handleDragEnd(e) {
+            this.classList.remove('dragging');
+            draggedRow = null;
         }
 
         function updateStatus(index, value) {
@@ -259,8 +365,19 @@
             milestones[index].required = value;
         }
 
-        function updateURL(index, value) {
+        function updateURL(index, value, inputElem) {
             milestones[index].url = value;
+            urlUpdatedFlags[index] = (value !== originalUrls[index]);
+            // Re-render the table to show highlight
+            renderTable();
+            // Optionally, keep focus on the input just edited
+            setTimeout(() => {
+                const tbody = document.getElementById('milestonesBody');
+                if (tbody.children[index]) {
+                    const urlInput = tbody.children[index].querySelector('input[type="text"]:not([placeholder])');
+                    if (urlInput) urlInput.focus();
+                }
+            }, 0);
         }
 
         function showOptOutModal() {
@@ -272,21 +389,65 @@
         }
 
         function confirmOptOut() {
-            milestones.forEach(milestone => {
-                milestone.status = "Inactive";
-            });
-            renderTable();
             closeModal();
-            showToast("You have successfully opted out of Niche Yield.");
+            showToast("You have successfully opted out of Niche Yield Campaign Messages.", true);
         }
 
-        function showToast(message) {
+        function saveChanges() {
+            // Validate Due Dates
+            let hasError = false;
+            // Clear all row errors first
+            dueDateErrorFlags = milestones.map(_ => false);
+
+            let today = new Date();
+            today.setHours(0,0,0,0);
+
+            milestones.forEach((milestone, idx) => {
+                if (milestone.dueDate && milestone.dueDate !== "") {
+                    // Accept only yyyy-mm-dd or mm/dd/yyyy
+                    let d = null;
+                    if (/^\d{4}-\d{2}-\d{2}$/.test(milestone.dueDate)) {
+                        d = new Date(milestone.dueDate + "T00:00:00");
+                    } else if (/^\d{2}\/\d{2}\/\d{4}$/.test(milestone.dueDate)) {
+                        let [mm, dd, yyyy] = milestone.dueDate.split('/');
+                        d = new Date(`${yyyy}-${mm}-${dd}T00:00:00`);
+                    } else {
+                        // Invalid format
+                        dueDateErrorFlags[idx] = true;
+                        hasError = true;
+                        return;
+                    }
+                    if (!(d instanceof Date) || isNaN(d) || d <= today) {
+                        dueDateErrorFlags[idx] = true;
+                        hasError = true;
+                    }
+                }
+            });
+
+            renderTable();
+
+            if (hasError) {
+                showToast('Error: Due Dates must be in the future. Please edit and then select "Approve" again.', false, true);
+                return;
+            }
+            showToast("Milestone Configuration approved", true);
+            // After approval, reset originalUrls and urlUpdatedFlags, and clear error highlights
+            originalUrls = milestones.map(m => m.url);
+            urlUpdatedFlags = milestones.map(_ => false);
+            dueDateErrorFlags = milestones.map(_ => false);
+            renderTable();
+        }
+
+        function showToast(message, success = false, error = false) {
             const toast = document.getElementById("toast");
             toast.textContent = message;
-            toast.className = "toast show";
+            toast.className = "toast" 
+                + (success ? " success" : "") 
+                + (error ? " error" : "") 
+                + " show";
             setTimeout(() => {
                 toast.className = toast.className.replace("show", "");
-            }, 3000);
+            }, 3500);
         }
 
         // Close modal if clicking outside of it
